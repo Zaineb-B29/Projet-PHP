@@ -1,44 +1,50 @@
 <?php
-// Include header
-require_once __DIR__ . '/../../includes/header.html';
-
 // Include database connection
 require_once __DIR__ . '/../../config/database.php';
 
+// Create database connection
+$database = new Database();
+$conn = $database->connect();
+
 // Check connection
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
+if (!$conn) {
+    die("Connection failed: Unable to connect to database");
 }
 
 // Handle form submission
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $name = trim($_POST['name']);
-    $email = trim($_POST['email']);
+    $login = trim($_POST['login']);
     $password = trim($_POST['password']);
 
     // Validate inputs
-    if (!empty($name) && !empty($email) && !empty($password)) {
-        // Hash the password
-        $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
-
-        // Insert into database
-        $sql = "INSERT INTO users (name, email, password) VALUES (?, ?, ?)";
+    if (!empty($login) && !empty($password)) {
+        // Check user credentials
+        $sql = "SELECT id, login, password FROM utilisateur WHERE login = ?";
         $stmt = $conn->prepare($sql);
-        $stmt->bind_param("sss", $name, $email, $hashedPassword);
+        $stmt->bindParam(1, $login);
+        $stmt->execute();
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if ($stmt->execute()) {
-            echo "Sign-up successful!";
+        if ($result) {
+            if (password_verify($password, $result['password'])) {
+                // Start session and store user data
+                session_start();
+                $_SESSION['user_id'] = $result['id'];
+                $_SESSION['user_login'] = $result['login'];
+                
+                // Redirect to home page
+                header("Location: /projet_php/public/index.php");
+                exit();
+            } else {
+                $error = "Invalid password";
+            }
         } else {
-            echo "Error: " . $stmt->error;
+            $error = "User not found";
         }
-
-        $stmt->close();
     } else {
-        echo "All fields are required!";
+        $error = "All fields are required";
     }
 }
-
-$conn->close();
 ?>
 
 <!DOCTYPE html>
@@ -46,33 +52,50 @@ $conn->close();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign Up</title>
-    <link rel="stylesheet" href="signin.css"> <!-- Update with your CSS file path -->
+    <title>Sign In</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link rel="stylesheet" href="/projet_php/public/style.css">
+    <link rel="stylesheet" href="signin.css">
 </head>
 <body>
-    <!-- From Uiverse.io by mi-series -->
+    <div class="white-container">
+        <?php
+        include_once(__DIR__ . '/../../views/templates/header/header.php');
+        ?>
+    </div>
+
     <div class="container">
         <div class="form_area">
-            <p class="title">SIGN UP</p>
+            <p class="title">SIGN IN</p>
+            <?php if (isset($error)): ?>
+                <div class="error"><?php echo $error; ?></div>
+            <?php endif; ?>
             <form action="" method="POST">
                 <div class="form_group">
-                    <label class="sub_title" for="name">Name</label>
-                    <input placeholder="Enter your full name" class="form_style" type="text" id="name" name="name" required>
-                </div>
-                <div class="form_group">
-                    <label class="sub_title" for="email">Email</label>
-                    <input placeholder="Enter your email" id="email" class="form_style" type="email" name="email" required>
+                    <label class="sub_title" for="login">Login</label>
+                    <input placeholder="Enter your login" id="login" class="form_style" type="text" name="login" required>
                 </div>
                 <div class="form_group">
                     <label class="sub_title" for="password">Password</label>
                     <input placeholder="Enter your password" id="password" class="form_style" type="password" name="password" required>
                 </div>
                 <div>
-                    <button class="btn" type="submit">SIGN UP</button>
-                    <p>Have an Account? <a class="link" href="../signup/singup.php">Sign Up Here!</a></p>
+                    <button class="btn" type="submit">SIGN IN</button>
+                    <p>Don't have an Account? <a class="link" href="/projet_php/public/signup/signup.php">Sign Up Here!</a></p>
                 </div>
             </form>
         </div>
     </div>
+
+    <div class="white-container">
+        <?php
+        include_once(__DIR__ . '/../../views/templates/footer/footer.php');
+        ?>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 </body>
 </html>
